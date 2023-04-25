@@ -6,7 +6,23 @@
 #include "sys/init.h"
 #include "sys/clock.h"
 
+#DEFINE WIN 2
+#DEFINE PLAYING 0
+#DEFINE LOSE 1
+
 static volatile char c=0;
+
+static volatile int timer_second = 0;
+
+static volatile int frequence_clinio = 1000;
+
+static volatile int frequence_timer = 0;
+
+static volatile int second_passed = 0;
+
+static volatile game_state = PLAYING;
+
+void tempo_500ms();
 
 void init_LD2(){
 	/* on positionne ce qu'il faut dans les différents
@@ -18,9 +34,38 @@ void init_LD2(){
 	GPIOA.PUPDR &= 0xFFFFF3FF;
 }
 
+void init_Tricolor_Led(){
+	/* on positionne ce qu'il faut dans les différents
+	   registres concernés */
+	RCC.AHB1ENR |= 0x01;
+
+	GPIOA.OTYPER &= ~(0x1<<8);
+	GPIOA.OSPEEDR |= 0x03<<10;
+
+	/*
+	//PARTIE ROUGE
+	GPIOA.MODER = (GPIOA.MODER & 0xFFFCFFFF) | 0x00010000;
+	GPIOA.PUPDR &= 0xFFFCFFFF;
+
+	// PARTIE VERT
+	GPIOA.MODER = (GPIOA.MODER & 0xFFF3FFFF) | 0x00040000;
+	GPIOA.PUPDR &= 0xFFF3FFFF;
+
+	// PARTIE BLEU
+	GPIOA.MODER = (GPIOA.MODER & 0xFFCFFFFF) | 0x00100000;
+	GPIOA.PUPDR &= 0xFFCFFFFF;
+	*/
+
+	// PARTIE ALL
+	GPIOA.MODER = (GPIOA.MODER & 0xFFC0FFFF) | 0x00150000;
+	GPIOA.PUPDR &= 0xFFC0FFFF;
+
+}
+
 void init_PB(){
 	/* GPIOC.MODER = ... */
 	GPIOC.MODER = (GPIOC.MODER & ~(0x3<<26));
+
 }
 
 int is_button_pressed(){
@@ -157,25 +202,32 @@ void __attribute__((interrupt)) SysTick_Handler(){
 	 * pour plus de détails.
 	 */
 	/* ... */
-}
 
-/* Fonction non bloquante envoyant une chaîne par l'UART */
-int _async_puts(const char* s) {
-	/* Cette fonction doit utiliser un traitant d'interruption
-	 * pour gérer l'envoi de la chaîne s (qui doit rester
-	 * valide pendant tout l'envoi). Elle doit donc être
-	 * non bloquante (pas d'attente active non plus) et
-	 * renvoyer 0.
-	 *
-	 * Si une chaîne est déjà en cours d'envoi, cette
-	 * fonction doit renvoyer 1 (et ignorer la nouvelle
-	 * chaîne).
-	 *
-	 * Si s est NULL, le code de retour permet de savoir
-	 * si une chaîne est encore en cours d'envoi ou si
-	 * une nouvelle chaîne peut être envoyée.
-	 */
-	/* À compléter */
+	/*
+	GPIOA.ODR = GPIOA.ODR |(0x0100); // ROUGE
+	GPIOA.ODR = GPIOA.ODR |(0x0200); // VERT
+	GPIOA.ODR = GPIOA.ODR |(0x0400); // BLEU */
+
+	timer_second++;
+	frequence_timer++;
+	if (timer_second >= 1000){ // Chaque seconde
+		timer_second = 0;
+		second_passed++;
+		if (second_passed >= 10) {
+			GPIOA.ODR = GPIOA.ODR |(0x0100); // ALLUMER ROUGE
+			GPIOA.ODR = GPIOA.ODR & ~(0x0400);  // STOP BLEU
+			game_state = LOSE;
+		} else if (second_passed % 2 == 0) { 
+			frequence_clinio = frequence_clinio / 2;		
+		}
+	}
+
+
+	if (frequence_timer >= frequence_clinio && game_state == PLAYING){
+		frequence_timer= 0;
+		GPIOA.ODR = GPIOA.ODR ^ (0x0400); // BLEU
+	}
+
 }
 
 int main() {
@@ -190,14 +242,10 @@ int main() {
 	printf("APB1CLK= %9lu Hz\r\n",get_APB1CLK());
 	printf("APB2CLK= %9lu Hz\r\n",get_APB2CLK());
 	printf("\r\n");
-	
-	//affichage_clavier();
-	ecrire_carac_puts();
-	//ecrire_carac();
+	init_Tricolor_Led();
+	systick_init(1000); // Traitant toutes les millisecondes
+
 	while (1){
-		//allumer_LED_infini();
-		//clignoter_LED();
-		//allumer_clignoter_LED();
 		
 	}
 	

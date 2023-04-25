@@ -7,7 +7,10 @@
 #include "sys/clock.h"
 
 static volatile char c=0;
+static volatile int  traitant = 0;
+static volatile int frequence_clinio = 500;
 
+void tempo_500ms();
 void init_LD2(){
 	/* on positionne ce qu'il faut dans les différents
 	   registres concernés */
@@ -156,7 +159,17 @@ void __attribute__((interrupt)) SysTick_Handler(){
 	 * cf les fichiers de compilation et d'édition de lien
 	 * pour plus de détails.
 	 */
-	/* ... */
+	
+	// Allumer la led dans le traitant
+	traitant++;
+	if (traitant >= frequence_clinio){
+		traitant = 0;
+		GPIOA.ODR = GPIOA.ODR ^ (0x0020);
+	} 
+/*else {
+		GPIOA.ODR = GPIOA.ODR |(0x0020);
+	}*/
+
 }
 
 /* Fonction non bloquante envoyant une chaîne par l'UART */
@@ -176,7 +189,8 @@ int _async_puts(const char* s) {
 	 * une nouvelle chaîne peut être envoyée.
 	 */
 	/* À compléter */
-}
+	return 1;
+	}
 
 int main() {
   
@@ -192,12 +206,23 @@ int main() {
 	printf("\r\n");
 	
 	//affichage_clavier();
-	ecrire_carac_puts();
 	//ecrire_carac();
+	init_LD2();
+	init_PB();
+	GPIOA.ODR = GPIOA.ODR | (0x0020);
+	systick_init(1000); // Toute les millisecondes
+
 	while (1){
 		//allumer_LED_infini();
 		//clignoter_LED();
 		//allumer_clignoter_LED();
+
+		if(is_button_pressed()){
+			frequence_clinio = 250;
+		}
+		else {
+			frequence_clinio = 1000;
+		}
 		
 	}
 	

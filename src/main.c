@@ -20,6 +20,65 @@ void init_LD2(){
 
 void init_PB(){
 	/* GPIOC.MODER = ... */
+	GPIOC.MODER = (GPIOC.MODER & ~(0x3<<26));
+}
+
+int is_button_pressed(){
+	/* renvoie 1 si button pressed (IDR13 = 0) */
+	return (GPIOC.IDR & (0x1<<13)) == 0;
+
+}
+
+void allumer_LED_infini(){
+	/* 
+		init_L2()
+		while vrai
+			si bouton push (voir avec IDR) alors
+				allumer LED
+	*/
+	
+	init_LD2();
+	init_PB();
+
+	while(1){
+		if(is_button_pressed()){
+			GPIOA.ODR = GPIOA.ODR |(0x0020);
+		}
+		else {
+			GPIOA.ODR = GPIOA.ODR & ~(0x0020);
+		}
+	}
+}
+
+void clignoter_LED(){
+	init_LD2();
+	while(1){
+		GPIOA.ODR = GPIOA.ODR |(0x0020);
+		tempo_500ms();
+		GPIOA.ODR = GPIOA.ODR & ~(0x0020);
+		tempo_500ms();
+	}
+}
+
+void allumer_clignoter_LED(){
+	init_LD2();
+	init_PB();
+
+	while(1){
+		if(is_button_pressed()){
+			GPIOA.ODR = GPIOA.ODR |(0x0020);
+		}
+		else {
+			GPIOA.ODR = GPIOA.ODR & ~(0x0020);
+			for(int i=0; i<4; i++){
+				tempo_500ms();
+			}
+			GPIOA.ODR = GPIOA.ODR |(0x0020);
+			for(int i=0; i<4; i++){
+				tempo_500ms();
+			}
+		}
+	}
 }
 
 void tempo_500ms(){
@@ -53,6 +112,34 @@ void _puts(const char *c){
 
 char _getc(){
 	/* À compléter */
+	char c;
+	scanf("%c",&c);	
+	return c;
+}
+
+
+void affichage_clavier(){	
+	while(1){
+		_putc(_getc());	
+	}
+}
+
+
+void ecrire_carac(){
+	_putc('c');
+	_putc(0x0A);
+	_putc('o');
+	//_putc(0x0D);
+	_putc('u');
+	//_putc(0x0A);
+	_putc('c');
+	_putc(0x0A);
+	_putc(0x0D);
+	_putc('o');
+}
+
+void ecrire_carac_puts(){
+	_puts("coucou");
 }
 
 /* Initialisation du timer système (systick) */
@@ -103,8 +190,17 @@ int main() {
 	printf("APB1CLK= %9lu Hz\r\n",get_APB1CLK());
 	printf("APB2CLK= %9lu Hz\r\n",get_APB2CLK());
 	printf("\r\n");
-
-	while (1);
+	
+	//affichage_clavier();
+	ecrire_carac_puts();
+	//ecrire_carac();
+	while (1){
+		//allumer_LED_infini();
+		//clignoter_LED();
+		//allumer_clignoter_LED();
+		
+	}
+	
 	return 0;
 }
 

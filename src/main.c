@@ -62,6 +62,17 @@ void init_Tricolor_Led(){
 
 }
 
+void init_Barre_Led(){
+	/* on positionne ce qu'il faut dans les différents
+	   registres concernés */
+	RCC.AHB1ENR |= 0x01;
+	GPIOA.OTYPER &= ~(0x1<<5);
+	GPIOA.OSPEEDR |= 0x03<<10;
+
+	GPIOA.MODER = (GPIOA.MODER & 0xFFFF03CF) | 0x00005500;
+	GPIOA.PUPDR &= 0xFFFF03CF;
+}
+
 void init_PB(){
 	/* GPIOC.MODER = ... */
 	GPIOC.MODER = (GPIOC.MODER & ~(0x3<<26));
@@ -244,6 +255,13 @@ int main() {
 	printf("\r\n");
 	init_Tricolor_Led();
 	systick_init(1000); // Traitant toutes les millisecondes
+	
+	init_Barre_Led();
+	GPIOA.ODR = GPIOA.ODR | (0x0010); // Allumer LED bas gauche
+	GPIOA.ODR = GPIOA.ODR | (0x0020); // Allumer LED bas droite
+	GPIOA.ODR = GPIOA.ODR | (0x0040);  // Allumer LED haut droite
+	GPIOA.ODR = GPIOA.ODR | (0x0080); // Allumer LED haut gauche
+
 
 	while (1){
 		

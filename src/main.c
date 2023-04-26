@@ -6,9 +6,9 @@
 #include "sys/init.h"
 #include "sys/clock.h"
 
-#DEFINE WIN 2
-#DEFINE PLAYING 0
-#DEFINE LOSE 1
+#define WIN 2
+#define PLAYING 0
+#define LOSE 1
 
 static volatile char c=0;
 
@@ -20,7 +20,7 @@ static volatile int frequence_timer = 0;
 
 static volatile int second_passed = 0;
 
-static volatile game_state = PLAYING;
+static volatile int game_state = PLAYING;
 
 void tempo_500ms();
 

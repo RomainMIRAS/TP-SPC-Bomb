@@ -79,6 +79,15 @@ void init_PB(){
 
 }
 
+void init_lever(){
+	RCC.AHB1ENR |= 0x03;
+	GPIOB.MODER = (GPIOB.MODER & ~(0x3<<10)) | 0x1<<10;
+}
+
+int is_lever_on(){
+	return !((GPIOB.IDR & (0x1<<5)) == 0);
+}
+
 int is_button_pressed(){
 	/* renvoie 1 si button pressed (IDR13 = 0) */
 	return (GPIOC.IDR & (0x1<<13)) == 0;
@@ -257,14 +266,22 @@ int main() {
 	systick_init(1000); // Traitant toutes les millisecondes
 	
 	init_Barre_Led();
+
+	init_lever();
+
 	GPIOA.ODR = GPIOA.ODR | (0x0010); // Allumer LED bas gauche
 	GPIOA.ODR = GPIOA.ODR | (0x0020); // Allumer LED bas droite
 	GPIOA.ODR = GPIOA.ODR | (0x0040);  // Allumer LED haut droite
 	GPIOA.ODR = GPIOA.ODR | (0x0080); // Allumer LED haut gauche
 
+	
 
 	while (1){
-		
+		if (!is_lever_on()) {
+			GPIOA.ODR = GPIOA.ODR &(0x00D0);
+		} else {
+			GPIOA.ODR = GPIOA.ODR | (0x0020);
+		}
 	}
 	
 	return 0;

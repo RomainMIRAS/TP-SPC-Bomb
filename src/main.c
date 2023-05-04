@@ -24,26 +24,14 @@ static volatile int game_state = PLAYING;
 
 void tempo_500ms();
 
-void init_LD2(){
-	/* on positionne ce qu'il faut dans les différents
-	   registres concernés */
-	RCC.AHB1ENR |= 0x01;
-	GPIOA.MODER = (GPIOA.MODER & 0xFFFFF3FF) | 0x00000400;
-	GPIOA.OTYPER &= ~(0x1<<5);
-	GPIOA.OSPEEDR |= 0x03<<10;
-	GPIOA.PUPDR &= 0xFFFFF3FF;
-}
-
-void init_Tricolor_Led(){
-	/* on positionne ce qu'il faut dans les différents
-	   registres concernés */
-	RCC.AHB1ENR |= 0x01;
-
-	GPIOA.OTYPER &= ~(0x1<<8);
-	GPIOA.OSPEEDR |= 0x03<<10;
+void initLedTricolor(){
+	RCC.AHB1ENR |= 0x01; //On modifie le GPIOA
 
 	/*
-	//PARTIE ROUGE
+		Initialisation des LED séparément
+	*/
+
+	/*//PARTIE ROUGE
 	GPIOA.MODER = (GPIOA.MODER & 0xFFFCFFFF) | 0x00010000;
 	GPIOA.PUPDR &= 0xFFFCFFFF;
 
@@ -53,97 +41,56 @@ void init_Tricolor_Led(){
 
 	// PARTIE BLEU
 	GPIOA.MODER = (GPIOA.MODER & 0xFFCFFFFF) | 0x00100000;
-	GPIOA.PUPDR &= 0xFFCFFFFF;
+	GPIOA.PUPDR &= 0xFFCFFFFF;*/
+	
+	/*
+		Initialisation de toutes les LED en même temps
 	*/
 
 	// PARTIE ALL
 	GPIOA.MODER = (GPIOA.MODER & 0xFFC0FFFF) | 0x00150000;
 	GPIOA.PUPDR &= 0xFFC0FFFF;
-
 }
 
-void init_Barre_Led(){
-	/* on positionne ce qu'il faut dans les différents
-	   registres concernés */
-	RCC.AHB1ENR |= 0x01;
-	GPIOA.OTYPER &= ~(0x1<<5);
-	GPIOA.OSPEEDR |= 0x03<<10;
+void initBarre4Led(){
+	
+	RCC.AHB1ENR |= 0x01; //On modifie le GPIOA
 
 	GPIOA.MODER = (GPIOA.MODER & 0xFFFF03CF) | 0x00005500;
 	GPIOA.PUPDR &= 0xFFFF03CF;
 }
 
-void init_PB(){
-	/* GPIOC.MODER = ... */
-	GPIOC.MODER = (GPIOC.MODER & ~(0x3<<26));
+void initLevers(){
+	RCC.AHB1ENR |= 0x02; //On modifie le GPIOB
 
+	/*
+		Initialisation des leviers séparément
+	*/
+	/*GPIOB.MODER = (GPIOB.MODER & ~(0x3<<12)) | 0x1<<12; // Init lever 1
+	GPIOB.MODER = (GPIOB.MODER & ~(0x3<<10)) | 0x1<<10; // Init lever 2
+	GPIOB.MODER = (GPIOB.MODER & ~(0x3<<8)) | 0x1<<8; // Init lever 3
+	GPIOB.MODER = (GPIOB.MODER & ~(0x3<<6)) | 0x1<<6; // Init lever 4*/
+
+	/*
+		Initialisation de tous les leviers en même temps
+	*/
+	GPIOB.MODER = (GPIOB.MODER & 0xFFFFC03F) | 0x00001540;
 }
 
-void init_lever(){
-	RCC.AHB1ENR |= 0x03;
-	GPIOB.MODER = (GPIOB.MODER & ~(0x3<<10)) | 0x1<<10;
+int isLever1On(){
+	return !((GPIOB.IDR & (0x1<<6)) == 0);
 }
 
-int is_lever_on(){
+int isLever2On(){
 	return !((GPIOB.IDR & (0x1<<5)) == 0);
 }
 
-int is_button_pressed(){
-	/* renvoie 1 si button pressed (IDR13 = 0) */
-	return (GPIOC.IDR & (0x1<<13)) == 0;
-
+int isLever3On(){
+	return !((GPIOB.IDR & (0x1<<4)) == 0);
 }
 
-void allumer_LED_infini(){
-	/* 
-		init_L2()
-		while vrai
-			si bouton push (voir avec IDR) alors
-				allumer LED
-	*/
-	
-	init_LD2();
-	init_PB();
-
-	while(1){
-		if(is_button_pressed()){
-			GPIOA.ODR = GPIOA.ODR |(0x0020);
-		}
-		else {
-			GPIOA.ODR = GPIOA.ODR & ~(0x0020);
-		}
-	}
-}
-
-void clignoter_LED(){
-	init_LD2();
-	while(1){
-		GPIOA.ODR = GPIOA.ODR |(0x0020);
-		tempo_500ms();
-		GPIOA.ODR = GPIOA.ODR & ~(0x0020);
-		tempo_500ms();
-	}
-}
-
-void allumer_clignoter_LED(){
-	init_LD2();
-	init_PB();
-
-	while(1){
-		if(is_button_pressed()){
-			GPIOA.ODR = GPIOA.ODR |(0x0020);
-		}
-		else {
-			GPIOA.ODR = GPIOA.ODR & ~(0x0020);
-			for(int i=0; i<4; i++){
-				tempo_500ms();
-			}
-			GPIOA.ODR = GPIOA.ODR |(0x0020);
-			for(int i=0; i<4; i++){
-				tempo_500ms();
-			}
-		}
-	}
+int isLever4On(){
+	return !((GPIOB.IDR & (0x1<<3)) == 0);
 }
 
 void tempo_500ms(){
@@ -153,58 +100,6 @@ void tempo_500ms(){
 		;
 	}
 
-}
-
-void init_USART(){
-	GPIOA.MODER = (GPIOA.MODER & 0xFFFFFF0F) | 0x000000A0;
-	GPIOA.AFRL = (GPIOA.AFRL & 0xFFFF00FF) | 0x00007700;
-	USART2.BRR = get_APB1CLK()/9600;
-	USART2.CR3 = 0;
-	USART2.CR2 = 0;
-}
-
-void _putc(const char c){
-	while( (USART2.SR & 0x80) == 0);  
-	USART2.DR = c;
-}
-
-void _puts(const char *c){
-	int len = strlen(c);
-	for (int i=0;i<len;i++){
-		_putc(c[i]);
-	}
-}
-
-char _getc(){
-	/* À compléter */
-	char c;
-	scanf("%c",&c);	
-	return c;
-}
-
-
-void affichage_clavier(){	
-	while(1){
-		_putc(_getc());	
-	}
-}
-
-
-void ecrire_carac(){
-	_putc('c');
-	_putc(0x0A);
-	_putc('o');
-	//_putc(0x0D);
-	_putc('u');
-	//_putc(0x0A);
-	_putc('c');
-	_putc(0x0A);
-	_putc(0x0D);
-	_putc('o');
-}
-
-void ecrire_carac_puts(){
-	_puts("coucou");
 }
 
 /* Initialisation du timer système (systick) */
@@ -250,6 +145,38 @@ void __attribute__((interrupt)) SysTick_Handler(){
 
 }
 
+void allumerLedHautGauche () {
+	GPIOA.ODR = GPIOA.ODR | (0x0080);
+}
+
+void allumerLedHautDroite () {
+	GPIOA.ODR = GPIOA.ODR | (0x0040);
+}
+
+void allumerLedBasDroite () {
+	GPIOA.ODR = GPIOA.ODR | (0x0020);
+}
+
+void allumerLedBasGauche () {
+	GPIOA.ODR = GPIOA.ODR | (0x0010);
+}
+
+void eteindreLedHautGauche () {
+	GPIOA.ODR = GPIOA.ODR &(0xFF7F);
+}
+
+void eteindreLedHautDroite () {
+	GPIOA.ODR = GPIOA.ODR &(0xFFBF);
+}
+
+void eteindreLedBasDroite () {
+	GPIOA.ODR = GPIOA.ODR &(0xFFDF);
+}
+
+void eteindreLedBasGauche () {
+	GPIOA.ODR = GPIOA.ODR &(0xFFEF);
+}
+
 int main() {
   
 	printf("\e[2J\e[1;1H\r\n");
@@ -262,25 +189,39 @@ int main() {
 	printf("APB1CLK= %9lu Hz\r\n",get_APB1CLK());
 	printf("APB2CLK= %9lu Hz\r\n",get_APB2CLK());
 	printf("\r\n");
-	init_Tricolor_Led();
 	systick_init(1000); // Traitant toutes les millisecondes
 	
-	init_Barre_Led();
-
-	init_lever();
-
-	GPIOA.ODR = GPIOA.ODR | (0x0010); // Allumer LED bas gauche
-	GPIOA.ODR = GPIOA.ODR | (0x0020); // Allumer LED bas droite
-	GPIOA.ODR = GPIOA.ODR | (0x0040);  // Allumer LED haut droite
-	GPIOA.ODR = GPIOA.ODR | (0x0080); // Allumer LED haut gauche
-
-	
+	/*
+		Initialisation of all component needed
+	*/
+	initBarre4Led();
+	initLedTricolor();
+	initLevers();
 
 	while (1){
-		if (!is_lever_on()) {
-			GPIOA.ODR = GPIOA.ODR &(0x00D0);
+		if (isLever1On()) {
+			allumerLedHautGauche();
 		} else {
-			GPIOA.ODR = GPIOA.ODR | (0x0020);
+			eteindreLedHautGauche();
+		}
+
+
+		if (isLever2On()) {
+			allumerLedHautDroite();
+		} else {
+			eteindreLedHautDroite();
+		}
+
+		if (isLever3On()) {
+			allumerLedBasGauche();
+		} else {
+			eteindreLedBasGauche();
+		}
+
+		if (isLever4On()) {
+			allumerLedBasDroite();
+		} else {
+			eteindreLedBasDroite();
 		}
 	}
 	

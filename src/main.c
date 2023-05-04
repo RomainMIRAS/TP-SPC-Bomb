@@ -10,17 +10,13 @@
 #define PLAYING 0
 #define LOSE 1
 
-static volatile char c=0;
+static volatile int frequenceCliniotement = 1000;
 
-static volatile int timer_second = 0;
+static volatile int compteurTick = 0;
 
-static volatile int frequence_clinio = 1000;
+static volatile int secondCounter = 0;
 
-static volatile int frequence_timer = 0;
-
-static volatile int second_passed = 0;
-
-static volatile int game_state = PLAYING;
+static volatile int etatJeu = PLAYING;
 
 void tempo_500ms();
 
@@ -93,56 +89,40 @@ int isLever4On(){
 	return !((GPIOB.IDR & (0x1<<3)) == 0);
 }
 
-void tempo_500ms(){
-	volatile uint32_t duree;
-	/* estimation, suppose que le compilateur n'optimise pas trop... */
-	for (duree = 0; duree < 5600000 ; duree++){
-		;
-	}
-
+void inverserEtatLedRouge () {
+	GPIOA.ODR = GPIOA.ODR ^(0x0100);
 }
 
-/* Initialisation du timer système (systick) */
-void systick_init(uint32_t freq){
-	uint32_t p = get_SYSCLK()/freq;
-	SysTick.LOAD = (p-1) & 0x00FFFFFF;
-	SysTick.VAL = 0;
-	SysTick.CTRL |= 7;
+void inverserEtatLedVert () {
+	GPIOA.ODR = GPIOA.ODR ^(0x0200);
 }
 
-void __attribute__((interrupt)) SysTick_Handler(){
-	/* Le fait de définir cette fonction suffit pour
-	 * qu'elle soit utilisée comme traitant,
-	 * cf les fichiers de compilation et d'édition de lien
-	 * pour plus de détails.
-	 */
-	/* ... */
+void inverserEtatLedBleu () {
+	GPIOA.ODR = GPIOA.ODR ^(0x0400);
+}
 
-	/*
-	GPIOA.ODR = GPIOA.ODR |(0x0100); // ROUGE
-	GPIOA.ODR = GPIOA.ODR |(0x0200); // VERT
-	GPIOA.ODR = GPIOA.ODR |(0x0400); // BLEU */
+void allumerLedRouge () {
+	GPIOA.ODR = GPIOA.ODR |(0x0100);
+}
 
-	timer_second++;
-	frequence_timer++;
-	if (timer_second >= 1000){ // Chaque seconde
-		timer_second = 0;
-		second_passed++;
-		if (second_passed >= 10) {
-			GPIOA.ODR = GPIOA.ODR |(0x0100); // ALLUMER ROUGE
-			GPIOA.ODR = GPIOA.ODR & ~(0x0400);  // STOP BLEU
-			game_state = LOSE;
-		} else if (second_passed % 2 == 0) { 
-			frequence_clinio = frequence_clinio / 2;		
-		}
-	}
+void allumerLedVert () {
+	GPIOA.ODR = GPIOA.ODR |(0x0200);
+}
 
+void allumerLedBleu () {
+	GPIOA.ODR = GPIOA.ODR |(0x0400);
+}
 
-	if (frequence_timer >= frequence_clinio && game_state == PLAYING){
-		frequence_timer= 0;
-		GPIOA.ODR = GPIOA.ODR ^ (0x0400); // BLEU
-	}
+void eteindreLedRouge () {
+	GPIOA.ODR = GPIOA.ODR &~(0x0100);
+}
 
+void eteindreLedVert () {
+	GPIOA.ODR = GPIOA.ODR &~(0x0200);
+}
+
+void eteindreLedBleu () {
+	GPIOA.ODR = GPIOA.ODR &~(0x0400);
 }
 
 void allumerLedHautGauche () {
@@ -177,6 +157,42 @@ void eteindreLedBasGauche () {
 	GPIOA.ODR = GPIOA.ODR &(0xFFEF);
 }
 
+void tempo_500ms(){
+	volatile uint32_t duree;
+	/* estimation, suppose que le compilateur n'optimise pas trop... */
+	for (duree = 0; duree < 5600000 ; duree++){
+		;
+	}
+
+}
+
+/* Initialisation du timer système (systick) */
+void systick_init(uint32_t freq){
+	uint32_t p = get_SYSCLK()/freq;
+	SysTick.LOAD = (p-1) & 0x00FFFFFF;
+	SysTick.VAL = 0;
+	SysTick.CTRL |= 7;
+}
+
+void __attribute__((interrupt)) SysTick_Handler(){
+	compteurTick++;
+
+	if (compteurTick%1000 == 0){ // Chaque seconde
+		secondCounter++;
+		if (secondCounter >= 10) { // Si ca fait plus de 10 secondes le joueur à perdu
+			allumerLedRouge();
+			eteindreLedBleu(); 
+			etatJeu = LOSE;
+		} else if (secondCounter % 2 == 0) { // Toutes les 2 secondes la vitesse de clignotement est divisé par 2
+			frequenceCliniotement = frequenceCliniotement / 2;		
+		}
+	}
+
+	if (compteurTick % frequenceCliniotement == 0 && etatJeu == PLAYING){
+		inverserEtatLedBleu();
+	}
+}
+
 int main() {
   
 	printf("\e[2J\e[1;1H\r\n");
@@ -189,11 +205,11 @@ int main() {
 	printf("APB1CLK= %9lu Hz\r\n",get_APB1CLK());
 	printf("APB2CLK= %9lu Hz\r\n",get_APB2CLK());
 	printf("\r\n");
-	systick_init(1000); // Traitant toutes les millisecondes
 	
 	/*
 		Initialisation of all component needed
 	*/
+	systick_init(1000); // Traitant toutes les millisecondes
 	initBarre4Led();
 	initLedTricolor();
 	initLevers();

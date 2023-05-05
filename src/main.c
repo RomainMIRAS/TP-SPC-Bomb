@@ -142,16 +142,32 @@ void allumerLedHautGauche () {
 	GPIOA.ODR = GPIOA.ODR | (0x0080);
 }
 
+int ledHautGaucheAllumer () {
+	return (GPIOA.ODR & 0x0080) != 0 ? 1 : 0; // LED haut gauche allumer ?
+}
+
 void allumerLedHautDroite () {
 	GPIOA.ODR = GPIOA.ODR | (0x0040);
+}
+
+int ledHautDroiteAllumer () {
+	return (GPIOA.ODR & 0x0040) != 0 ? 1 : 0; // LED haut droite allumer ?
 }
 
 void allumerLedBasDroite () {
 	GPIOA.ODR = GPIOA.ODR | (0x0020);
 }
 
+int ledBasDroiteAllumer () {
+	return (GPIOA.ODR & 0x0020) != 0 ? 1 : 0; // LED bas droite allumer ?
+}
+
 void allumerLedBasGauche () {
 	GPIOA.ODR = GPIOA.ODR | (0x0010);
+}
+
+int ledBasGaucheAllumer () {
+	return (GPIOA.ODR & 0x0010) != 0 ? 1 : 0; // LED bas gauche allumer ?
 }
 
 void eteindreLedHautGauche () {
@@ -194,9 +210,7 @@ void __attribute__((interrupt)) SysTick_Handler(){
 		
 		if (compteurTick%1000 == 0){ // Chaque seconde
 			secondCounter++;
-			if (secondCounter >= 10) { // Si ca fait plus de 10 secondes le joueur à perdu
-				allumerLedRouge();
-				eteindreLedBleu(); 
+			if (secondCounter >= 10 && etatJeu == PLAYING) { // Si ca fait plus de 10 secondes le joueur à perdu
 				etatJeu = LOSE;
 			} else if (secondCounter % 2 == 0) { // Toutes les 2 secondes la vitesse de clignotement est divisé par 2
 				frequenceCliniotement = frequenceCliniotement / 2;		
@@ -207,6 +221,49 @@ void __attribute__((interrupt)) SysTick_Handler(){
 			inverserEtatLedBleu();
 		}
 	}
+}
+
+void initBombe() {
+	do {
+		int ledOn = rand() % 2;
+		if (ledOn) {
+			allumerLedBasDroite();
+		} else {
+			eteindreLedBasDroite();
+		}
+
+		ledOn = rand() % 2;
+
+		if (ledOn) {
+			allumerLedBasGauche();
+		} else {
+			eteindreLedBasGauche();
+		}
+
+		ledOn = rand() % 2;
+
+		if (ledOn) {
+			allumerLedHautDroite();
+		} else {
+			eteindreLedHautDroite();
+		}
+
+		ledOn = rand() % 2;
+
+		if (ledOn) {
+			allumerLedHautGauche();
+		} else {
+			eteindreLedHautGauche();
+		}
+		
+	} while (ledBasDroiteAllumer() && ledBasGaucheAllumer() && ledHautDroiteAllumer() && ledHautGaucheAllumer());
+}
+
+/*
+Make a sound when the player loose
+*/
+void loosingSong () {
+
 }
 
 int main() {
@@ -231,31 +288,68 @@ int main() {
 	initLevers();
 	initButton();
 
-	int ledToTurnOn = 0;
+	int previousStateLever1 = isLever1On();
+	int previousStateLever2 = isLever2On();
+	int previousStateLever3 = isLever3On();
+	int previousStateLever4 = isLever4On();
 
 	while (1){
 		if (etatJeu == WAITING) {
-			if (isButtonPressed()) {
+			if (isButtonPressed()) { // Quand on lance le jeu, on initialise le générateur aléatoire
 				etatJeu = PLAYING;
 				srand(compteurTick);
-				ledToTurnOn = rand() % 4;
+				initBombe();
 			}
-		} else {
-			switch (ledToTurnOn){
-				case 0:
+		} else if (etatJeu == PLAYING) {
+			if (ledBasDroiteAllumer() && ledBasGaucheAllumer() && ledHautDroiteAllumer() && ledHautGaucheAllumer()) { //Si toutes les LED sont allumé
+				etatJeu = WIN;
+			}
+
+			int actualLeverState = isLever1On();
+			if (previousStateLever1 != actualLeverState) {
+				previousStateLever1 = actualLeverState;
 				allumerLedBasDroite();
-				break;
-				case 1:
-				allumerLedBasGauche();
-				break;
-				case 2:
-				allumerLedHautDroite();
-				break;
-				default:
-				allumerLedHautGauche();
-				break;
 			}
-				
+
+			actualLeverState = isLever2On();
+			if (previousStateLever2 != actualLeverState) {
+				previousStateLever2 = actualLeverState;
+				allumerLedBasGauche();
+				eteindreLedBasDroite();
+			}
+
+			actualLeverState = isLever3On();
+			if (previousStateLever3 != actualLeverState) {
+				previousStateLever3 = actualLeverState;
+				allumerLedHautDroite();
+				eteindreLedBasGauche();
+			}
+
+			actualLeverState = isLever4On();
+			if (previousStateLever4 != actualLeverState) {
+				previousStateLever4 = actualLeverState;
+				allumerLedHautGauche();
+				eteindreLedHautDroite();
+			}
+		} else if (etatJeu == WIN) { // Si on a gagner la LED verte s'allume
+			eteindreLedBleu();
+			allumerLedVert();
+		} else { //Si on a perdu la LED rouge s'allume
+			eteindreLedBleu();
+			allumerLedRouge();
+			loosingSong();
+		}
+
+		if (etatJeu == WIN || etatJeu == LOSE) {
+			if (isButtonPressed()) {
+				frequenceCliniotement = 1000;
+				compteurTick = 0;
+				secondCounter = 0;
+				etatJeu = PLAYING;
+				eteindreLedRouge();
+				eteindreLedVert();
+				initBombe();
+			}
 		}
 	}
 	

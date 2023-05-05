@@ -9,22 +9,23 @@
 #include <stdlib.h>
 
 #define WIN 2
+#define LOSE 1
 #define PLAYING 0
 #define WAITING -1
-#define LOSE 1
 
 static volatile int frequenceCliniotement = 1000;
 
-static volatile int compteurTick = 0;
+static volatile int compteurMiliseconde = 0;
 
 static volatile int secondCounter = 0;
 
 static volatile int etatJeu = WAITING;
 
-void tempo_500ms();
-
-void initLedTricolor(){
-	RCC.AHB1ENR |= 0x01; //On modifie le GPIOA
+/*
+	Initialise toutes les couleurs de la LED tricolore
+*/
+void initLedTricolore(){
+	RCC.AHB1ENR |= 0x01; //On selectionne le GPIO modifié (le A)
 
 	/*
 		Initialisation des LED séparément
@@ -45,26 +46,30 @@ void initLedTricolor(){
 	/*
 		Initialisation de toutes les LED en même temps
 	*/
-
-	// PARTIE ALL
 	GPIOA.MODER = (GPIOA.MODER & 0xFFC0FFFF) | 0x00150000;
 	GPIOA.PUPDR &= 0xFFC0FFFF;
 }
 
+/*
+	Initialise toutes les LED de la barre de 4 LED
+*/
 void initBarre4Led(){
 	
-	RCC.AHB1ENR |= 0x01; //On modifie le GPIOA
+	RCC.AHB1ENR |= 0x01; //On selectionne le GPIO modifié (le A)
 
+	/*
+		Initialisation de toutes les LED en même temps
+	*/
 	GPIOA.MODER = (GPIOA.MODER & 0xFFFF03CF) | 0x00005500;
 	GPIOA.PUPDR &= 0xFFFF03CF;
 }
 
 void initLevers(){
-	RCC.AHB1ENR |= 0x02; //On modifie le GPIOB
+	RCC.AHB1ENR |= 0x02;  //On selectionne le GPIO modifié (le B)
 
 	/*
 		Initialisation des leviers séparément
-	*/
+	*///On modifie le GPIOB
 	/*GPIOB.MODER = (GPIOB.MODER & ~(0x3<<12)) | 0x1<<12; // Init lever 1
 	GPIOB.MODER = (GPIOB.MODER & ~(0x3<<10)) | 0x1<<10; // Init lever 2
 	GPIOB.MODER = (GPIOB.MODER & ~(0x3<<8)) | 0x1<<8; // Init lever 3
@@ -76,123 +81,194 @@ void initLevers(){
 	GPIOB.MODER = (GPIOB.MODER & 0xFFFFC03F) | 0x00001540;
 }
 
+/*
+	Renvoie 1 si le levier 1 est sur la position ON et 0 sinon
+*/
 int isLever1On(){
 	return !((GPIOB.IDR & (0x1<<6)) == 0);
 }
 
+/*
+	Renvoie 1 si le levier 2 est sur la position ON et 0 sinon
+*/
 int isLever2On(){
 	return !((GPIOB.IDR & (0x1<<5)) == 0);
 }
 
+/*
+	Renvoie 1 si le levier 3 est sur la position ON et 0 sinon
+*/
 int isLever3On(){
 	return !((GPIOB.IDR & (0x1<<4)) == 0);
 }
 
+/*
+	Renvoie 1 si le levier 4 est sur la position ON et 0 sinon
+*/
 int isLever4On(){
 	return !((GPIOB.IDR & (0x1<<3)) == 0);
 }
 
+/*
+	Initialise le bouton de la carte fille
+*/
 void initButton(){
-	RCC.AHB1ENR |= 0x02;
+	RCC.AHB1ENR |= 0x02; //On selectionne le GPIO modifié (le B)
 	GPIOB.MODER = (GPIOB.MODER & ~(0x3<<16));
 }
 
+/*
+	Renvoie 1 si le bouton de la carte fille est enfoncé et 0 sinon
+*/
 int isButtonPressed(){
 	return (GPIOB.IDR & (0x1<<8)) == 0;
-
 }
 
+/*
+	Inverse l'état de la LED rouge (allumé => éteint, éteint => allumé)
+*/
 void inverserEtatLedRouge () {
 	GPIOA.ODR = GPIOA.ODR ^(0x0100);
 }
 
+/*
+	Inverse l'état de la LED vert (allumé => éteint, éteint => allumé)
+*/
 void inverserEtatLedVert () {
 	GPIOA.ODR = GPIOA.ODR ^(0x0200);
 }
 
+/*
+	Inverse l'état de la LED bleu (allumé => éteint, éteint => allumé)
+*/
 void inverserEtatLedBleu () {
 	GPIOA.ODR = GPIOA.ODR ^(0x0400);
 }
 
+/*
+	Allume la LED rouge
+*/
 void allumerLedRouge () {
 	GPIOA.ODR = GPIOA.ODR |(0x0100);
 }
 
+/*
+	Allume la LED verte
+*/
 void allumerLedVert () {
 	GPIOA.ODR = GPIOA.ODR |(0x0200);
 }
 
+/*
+	Allume la LED bleu
+*/
 void allumerLedBleu () {
 	GPIOA.ODR = GPIOA.ODR |(0x0400);
 }
 
+/*
+	Eteins la LED rouge
+*/
 void eteindreLedRouge () {
 	GPIOA.ODR = GPIOA.ODR &~(0x0100);
 }
 
+/*
+	Eteins la LED verte
+*/
 void eteindreLedVert () {
 	GPIOA.ODR = GPIOA.ODR &~(0x0200);
 }
 
+/*
+	Eteins la LED bleu
+*/
 void eteindreLedBleu () {
 	GPIOA.ODR = GPIOA.ODR &~(0x0400);
 }
 
+/*
+	Allume la LED en haut à gauche sur la barre de 4 LED
+*/
 void allumerLedHautGauche () {
 	GPIOA.ODR = GPIOA.ODR | (0x0080);
 }
 
-int ledHautGaucheAllumer () {
-	return (GPIOA.ODR & 0x0080) != 0 ? 1 : 0; // LED haut gauche allumer ?
+/*
+	Renvoie 1 si la LED en haut à gauche de la barre de 4 LED est allumé et 0 sinon
+*/
+int isLedHautGaucheOn () {
+	return (GPIOA.ODR & 0x0080) != 0 ? 1 : 0;
 }
 
+/*
+	Allume la LED en haut à droite sur la barre de 4 LED
+*/
 void allumerLedHautDroite () {
 	GPIOA.ODR = GPIOA.ODR | (0x0040);
 }
 
-int ledHautDroiteAllumer () {
-	return (GPIOA.ODR & 0x0040) != 0 ? 1 : 0; // LED haut droite allumer ?
+/*
+	Renvoie 1 si la LED en haut à droite de la barre de 4 LED est allumé et 0 sinon
+*/
+int isLedHautDroiteOn () {
+	return (GPIOA.ODR & 0x0040) != 0 ? 1 : 0;
 }
 
+/*
+	Allume la LED en bas à droite sur la barre de 4 LED
+*/
 void allumerLedBasDroite () {
 	GPIOA.ODR = GPIOA.ODR | (0x0020);
 }
 
-int ledBasDroiteAllumer () {
+/*
+	Renvoie 1 si la LED en bas à droite de la barre de 4 LED est allumé et 0 sinon
+*/
+int isLedBasDroiteOn () {
 	return (GPIOA.ODR & 0x0020) != 0 ? 1 : 0; // LED bas droite allumer ?
 }
 
+/*
+	Allume la LED en bas à gauche sur la barre de 4 LED
+*/
 void allumerLedBasGauche () {
 	GPIOA.ODR = GPIOA.ODR | (0x0010);
 }
 
-int ledBasGaucheAllumer () {
+/*
+	Renvoie 1 si la LED en bas à gauche de la barre de 4 LED est allumé et 0 sinon
+*/
+int isLedBasGaucheOn () {
 	return (GPIOA.ODR & 0x0010) != 0 ? 1 : 0; // LED bas gauche allumer ?
 }
 
+/*
+	Eteins la LED en haut à gauche sur la barre de 4 LED
+*/
 void eteindreLedHautGauche () {
 	GPIOA.ODR = GPIOA.ODR &(0xFF7F);
 }
 
+/*
+	Eteins la LED en haut à droite sur la barre de 4 LED
+*/
 void eteindreLedHautDroite () {
 	GPIOA.ODR = GPIOA.ODR &(0xFFBF);
 }
 
+/*
+	Eteins la LED en bas à droite sur la barre de 4 LED
+*/
 void eteindreLedBasDroite () {
 	GPIOA.ODR = GPIOA.ODR &(0xFFDF);
 }
 
+/*
+	Eteins la LED en bas à gauche sur la barre de 4 LED
+*/
 void eteindreLedBasGauche () {
 	GPIOA.ODR = GPIOA.ODR &(0xFFEF);
-}
-
-void tempo_500ms(){
-	volatile uint32_t duree;
-	/* estimation, suppose que le compilateur n'optimise pas trop... */
-	for (duree = 0; duree < 5600000 ; duree++){
-		;
-	}
-
 }
 
 /* Initialisation du timer système (systick) */
@@ -202,27 +278,42 @@ void systick_init(uint32_t freq){
 	SysTick.VAL = 0;
 	SysTick.CTRL |= 7;
 }
-
+/*
+Traitant d'intéruption du timer (appelé toutes les miliseconde)
+*/
 void __attribute__((interrupt)) SysTick_Handler(){
-	compteurTick++;
+	compteurMiliseconde++;
 
 	if (etatJeu != WAITING) {
 		
-		if (compteurTick%1000 == 0){ // Chaque seconde
+		if (compteurMiliseconde%1000 == 0){ // Chaque seconde
 			secondCounter++;
-			if (secondCounter >= 10 && etatJeu == PLAYING) { // Si ca fait plus de 10 secondes le joueur à perdu
+
+			if (secondCounter >= 30 && etatJeu == PLAYING) { // Si ca fait plus de 30 secondes le joueur à perdu
 				etatJeu = LOSE;
-			} else if (secondCounter % 2 == 0) { // Toutes les 2 secondes la vitesse de clignotement est divisé par 2
-				frequenceCliniotement = frequenceCliniotement / 2;		
+			} 
+			
+			if (secondCounter % 5 == 0) { // Toutes les 5 secondes la vitesse de clignotement est divisé par 2
+				frequenceCliniotement = frequenceCliniotement / 2;
 			}
 		}
+	}
 
-		if (compteurTick % frequenceCliniotement == 0 && etatJeu == PLAYING){
+	if (compteurMiliseconde % frequenceCliniotement == 0 && etatJeu == PLAYING){
 			inverserEtatLedBleu();
-		}
 	}
 }
 
+/*
+	Renvoie 1 si toutes les LED sont allumé (la bombe est éteinte) et 0 sinon
+*/
+int bombeOff () {
+	return isLedBasDroiteOn() && isLedBasGaucheOn() && isLedHautDroiteOn() && isLedHautGaucheOn();
+}
+
+/*
+Initialise les 4 LED de la barre de lED de manière aléatoire avec au minimum 1 LED éteinte
+*/
 void initBombe() {
 	do {
 		int ledOn = rand() % 2;
@@ -232,31 +323,64 @@ void initBombe() {
 			eteindreLedBasDroite();
 		}
 
-		ledOn = rand() % 2;
 
+		ledOn = rand() % 2;
 		if (ledOn) {
 			allumerLedBasGauche();
 		} else {
 			eteindreLedBasGauche();
 		}
 
-		ledOn = rand() % 2;
 
+		ledOn = rand() % 2;
 		if (ledOn) {
 			allumerLedHautDroite();
 		} else {
 			eteindreLedHautDroite();
 		}
 
-		ledOn = rand() % 2;
 
+		ledOn = rand() % 2;
 		if (ledOn) {
 			allumerLedHautGauche();
 		} else {
 			eteindreLedHautGauche();
 		}
-		
-	} while (ledBasDroiteAllumer() && ledBasGaucheAllumer() && ledHautDroiteAllumer() && ledHautGaucheAllumer());
+	} while (bombeOff());
+}
+
+/*
+	Remet le jeu à 0 de manière à pouvoir refaire une partit
+*/
+void restart () {
+	frequenceCliniotement = 1000;
+	compteurMiliseconde = 0;
+	secondCounter = 0;
+	etatJeu = PLAYING;
+	eteindreLedRouge();
+	eteindreLedVert();
+	initBombe();
+}
+
+/*
+	Initialise tous les composant dont nous avons besoin
+*/
+void initAll () {
+	systick_init(1000);	//Traitant du timer toutes les millisecondes
+	initBarre4Led();	//Initialisation de la barre de LED
+	initLedTricolore();	//Initialisation de la LED tricolore
+	initLevers();		//Initialisation des leviers
+	initButton();		//Initialisation du boutons de la carte fille
+}
+
+/*
+	Lance le début du jeu
+*/
+void startGame() {
+	etatJeu = PLAYING;
+	srand(compteurMiliseconde);
+	compteurMiliseconde = 0;
+	initBombe();
 }
 
 /*
@@ -278,16 +402,13 @@ int main() {
 	printf("APB1CLK= %9lu Hz\r\n",get_APB1CLK());
 	printf("APB2CLK= %9lu Hz\r\n",get_APB2CLK());
 	printf("\r\n");
-	
-	/*
-		Initialisation of all component needed
-	*/
-	systick_init(1000); // Traitant toutes les millisecondes
-	initBarre4Led();
-	initLedTricolor();
-	initLevers();
-	initButton();
 
+	initAll(); // Initialisation de tous les composants
+
+	/*
+		Variable pour garder l'état précédent des leviers en mémoire
+		=> Permet de se servir des leviers comme d'un bouton (à chaque changement => pression d'un bouton)
+	*/
 	int previousStateLever1 = isLever1On();
 	int previousStateLever2 = isLever2On();
 	int previousStateLever3 = isLever3On();
@@ -296,12 +417,10 @@ int main() {
 	while (1){
 		if (etatJeu == WAITING) {
 			if (isButtonPressed()) { // Quand on lance le jeu, on initialise le générateur aléatoire
-				etatJeu = PLAYING;
-				srand(compteurTick);
-				initBombe();
+				startGame();
 			}
 		} else if (etatJeu == PLAYING) {
-			if (ledBasDroiteAllumer() && ledBasGaucheAllumer() && ledHautDroiteAllumer() && ledHautGaucheAllumer()) { //Si toutes les LED sont allumé
+			if (bombeOff()) { //Si toutes les LED sont allumé
 				etatJeu = WIN;
 			}
 
@@ -342,13 +461,7 @@ int main() {
 
 		if (etatJeu == WIN || etatJeu == LOSE) {
 			if (isButtonPressed()) {
-				frequenceCliniotement = 1000;
-				compteurTick = 0;
-				secondCounter = 0;
-				etatJeu = PLAYING;
-				eteindreLedRouge();
-				eteindreLedVert();
-				initBombe();
+				restart();
 			}
 		}
 	}

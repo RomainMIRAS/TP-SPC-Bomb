@@ -5,9 +5,12 @@
 #include "sys/devices.h"
 #include "sys/init.h"
 #include "sys/clock.h"
+#include <stdbool.h>
+#include <stdlib.h>
 
 #define WIN 2
 #define PLAYING 0
+#define WAITING -1
 #define LOSE 1
 
 static volatile int frequenceCliniotement = 1000;
@@ -16,7 +19,7 @@ static volatile int compteurTick = 0;
 
 static volatile int secondCounter = 0;
 
-static volatile int etatJeu = PLAYING;
+static volatile int etatJeu = WAITING;
 
 void tempo_500ms();
 
@@ -87,6 +90,16 @@ int isLever3On(){
 
 int isLever4On(){
 	return !((GPIOB.IDR & (0x1<<3)) == 0);
+}
+
+void initButton(){
+	RCC.AHB1ENR |= 0x02;
+	GPIOB.MODER = (GPIOB.MODER & ~(0x3<<16));
+}
+
+int isButtonPressed(){
+	return (GPIOB.IDR & (0x1<<8)) == 0;
+
 }
 
 void inverserEtatLedRouge () {
@@ -177,19 +190,22 @@ void systick_init(uint32_t freq){
 void __attribute__((interrupt)) SysTick_Handler(){
 	compteurTick++;
 
-	if (compteurTick%1000 == 0){ // Chaque seconde
-		secondCounter++;
-		if (secondCounter >= 10) { // Si ca fait plus de 10 secondes le joueur à perdu
-			allumerLedRouge();
-			eteindreLedBleu(); 
-			etatJeu = LOSE;
-		} else if (secondCounter % 2 == 0) { // Toutes les 2 secondes la vitesse de clignotement est divisé par 2
-			frequenceCliniotement = frequenceCliniotement / 2;		
+	if (etatJeu != WAITING) {
+		
+		if (compteurTick%1000 == 0){ // Chaque seconde
+			secondCounter++;
+			if (secondCounter >= 10) { // Si ca fait plus de 10 secondes le joueur à perdu
+				allumerLedRouge();
+				eteindreLedBleu(); 
+				etatJeu = LOSE;
+			} else if (secondCounter % 2 == 0) { // Toutes les 2 secondes la vitesse de clignotement est divisé par 2
+				frequenceCliniotement = frequenceCliniotement / 2;		
+			}
 		}
-	}
 
-	if (compteurTick % frequenceCliniotement == 0 && etatJeu == PLAYING){
-		inverserEtatLedBleu();
+		if (compteurTick % frequenceCliniotement == 0 && etatJeu == PLAYING){
+			inverserEtatLedBleu();
+		}
 	}
 }
 
@@ -213,31 +229,33 @@ int main() {
 	initBarre4Led();
 	initLedTricolor();
 	initLevers();
+	initButton();
+
+	int ledToTurnOn = 0;
 
 	while (1){
-		if (isLever1On()) {
-			allumerLedHautGauche();
+		if (etatJeu == WAITING) {
+			if (isButtonPressed()) {
+				etatJeu = PLAYING;
+				srand(compteurTick);
+				ledToTurnOn = rand() % 4;
+			}
 		} else {
-			eteindreLedHautGauche();
-		}
-
-
-		if (isLever2On()) {
-			allumerLedHautDroite();
-		} else {
-			eteindreLedHautDroite();
-		}
-
-		if (isLever3On()) {
-			allumerLedBasGauche();
-		} else {
-			eteindreLedBasGauche();
-		}
-
-		if (isLever4On()) {
-			allumerLedBasDroite();
-		} else {
-			eteindreLedBasDroite();
+			switch (ledToTurnOn){
+				case 0:
+				allumerLedBasDroite();
+				break;
+				case 1:
+				allumerLedBasGauche();
+				break;
+				case 2:
+				allumerLedHautDroite();
+				break;
+				default:
+				allumerLedHautGauche();
+				break;
+			}
+				
 		}
 	}
 	

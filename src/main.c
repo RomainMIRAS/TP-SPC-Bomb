@@ -19,11 +19,13 @@ static volatile int compteurMiliseconde = 0;
 
 static volatile int secondCounter = 0;
 
-static const int freq_buzzer = 5;
+static const int freq_buzzer = 2;
 
 static volatile int switch_buzzer = freq_buzzer;
 
 static volatile int etatJeu = WAITING;
+
+static volatile int makeSound = 0;
 
 
 /*
@@ -70,13 +72,30 @@ void initBarre4Led(){
 }
 
 void initBuzzer(){
-	RCC.AHB1ENR |= 0x02; // GPIOB
+	RCC.AHB1ENR |= 0x02; //On selectionne le GPIO modifié (le B)
 
-	//As a Led on GPIOB on pin 9
 	GPIOB.OTYPER &= ~(0x1<<9); //Output push-pull
 	GPIOB.OSPEEDR |= 0x03<<18; //High speed
 	GPIOB.MODER = (GPIOB.MODER & 0xFFF3FFFF) | 0x00040000; //Output function
 	GPIOB.PUPDR &= 0xFFF3FFFF;// No pull-up, no pull-down
+}
+
+/*
+	Inverse l'état du Buzzer (allumé => éteint, éteint => allumé)
+*/
+void inverserEtatBuzz () {
+	GPIOB.ODR = GPIOB.ODR ^(0x0200);
+}
+
+/*
+Make a sound
+*/
+void buzz() {
+	switch_buzzer--;
+	if (switch_buzzer == 0){
+		inverserEtatBuzz();
+		switch_buzzer = freq_buzzer;
+	}
 }
 
 void initLevers(){
@@ -159,14 +178,6 @@ void inverserEtatLedVert () {
 void inverserEtatLedBleu () {
 	GPIOA.ODR = GPIOA.ODR ^(0x0400);
 }
-
-/*
-	Inverse l'état du Buzzer (allumé => éteint, éteint => allumé)
-*/
-void inverserEtatBuzz () {
-	GPIOB.ODR = GPIOB.ODR ^(0x0200);
-}
- 
 
 /*
 	Allume la LED rouge
@@ -294,17 +305,6 @@ void eteindreLedBasGauche () {
 	GPIOA.ODR = GPIOA.ODR &(0xFFEF);
 }
 
-/*
-Make a sound when the player loose for 5 seconds
-*/
-void buzz() {
-	switch_buzzer--;
-	if (switch_buzzer == 0){
-		inverserEtatBuzz();
-		switch_buzzer = freq_buzzer;
-	}
-}
-
 /* Initialisation du timer système (systick) */
 void systick_init(uint32_t freq){
 	uint32_t p = get_SYSCLK()/freq;
@@ -330,13 +330,36 @@ void __attribute__((interrupt)) SysTick_Handler(){
 				frequenceCliniotement = frequenceCliniotement / 2;
 			}
 		}
+
+		int freqSoundBeforeBomb;
+
+		switch (secondCounter) { // On gère la vitesse du "clignotment" du son (de plus en plus rapide quand on approche des 30 secondes)
+		case 25:
+		case 26:
+			freqSoundBeforeBomb = 200;
+			break;
+		case 27:
+		case 28:
+			freqSoundBeforeBomb = 100;
+			break;
+		case 29:
+			freqSoundBeforeBomb = 40;
+			break;
+		default:
+			freqSoundBeforeBomb = 0;
+			break;
+		}
+
+		if (freqSoundBeforeBomb != 0 && compteurMiliseconde % freqSoundBeforeBomb == 0) { //On fait "clignoter" le son
+			makeSound = !makeSound;
+		}
 	}
 
-	if (compteurMiliseconde % frequenceCliniotement == 0 && etatJeu == PLAYING){
+	if (compteurMiliseconde % frequenceCliniotement == 0 && etatJeu == PLAYING){ //On gère le clignotement de la LED bleu
 			inverserEtatLedBleu();
 	}
 
-	if (etatJeu == LOSE) {
+	if (etatJeu == LOSE || makeSound) { // Si on a perdu ou qu'il faut jouer du son on active le son
 		buzz();
 	}
 }

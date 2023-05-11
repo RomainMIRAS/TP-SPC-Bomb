@@ -420,6 +420,7 @@ void restart () {
 	eteindreLedRouge();
 	eteindreLedVert();
 	initBombe();
+	makeSound = false;
 }
 
 /*

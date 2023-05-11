@@ -99,6 +99,11 @@ void init_USART(){
 	USART2.BRR = get_APB1CLK()/9600;
 	USART2.CR3 = 0;
 	USART2.CR2 = 0;
+
+	// INTERRUPTIONS USART2
+	USART2.CR1 |= 0x20;
+	USART2.CR1 |= 0x0020;
+	USART2.CR1 |= 0x0001;
 }
 
 void _putc(const char c){
@@ -107,42 +112,21 @@ void _putc(const char c){
 }
 
 void _puts(const char *c){
-	int len = strlen(c);
-	for (int i=0;i<len;i++){
-		_putc(c[i]);
+	while(*c != '\0'){
+		_putc(*c);
+		c++;
 	}
 }
 
 char _getc(){
-	/* À compléter */
-	char c;
-	scanf("%c",&c);	
-	return c;
+	while( (USART2.SR & 0x20) == 0);  
+	return USART2.DR;
 }
-
 
 void affichage_clavier(){	
 	while(1){
 		_putc(_getc());	
 	}
-}
-
-
-void ecrire_carac(){
-	_putc('c');
-	_putc(0x0A);
-	_putc('o');
-	//_putc(0x0D);
-	_putc('u');
-	//_putc(0x0A);
-	_putc('c');
-	_putc(0x0A);
-	_putc(0x0D);
-	_putc('o');
-}
-
-void ecrire_carac_puts(){
-	_puts("coucou");
 }
 
 /* Initialisation du timer système (systick) */
@@ -166,13 +150,25 @@ void __attribute__((interrupt)) SysTick_Handler(){
 		traitant = 0;
 		GPIOA.ODR = GPIOA.ODR ^ (0x0020);
 	} 
-/*else {
-		GPIOA.ODR = GPIOA.ODR |(0x0020);
-	}*/
-
 }
 
-/* Fonction non bloquante envoyant une chaîne par l'UART */
+// INTERRUPTIONS USART
+void __attribute__((interrupt)) USART2_Handler(){
+	/* Le fait de définir cette fonction suffit pour
+	 * qu'elle soit utilisée comme traitant,
+	 * cf les fichiers de compilation et d'édition de lien
+	 * pour plus de détails.
+	 */
+	printf("1000\n");
+	if (USART2.SR & 0x20){
+		frequence_clinio = 1000;
+		printf("1000\n");
+	} else {
+		frequence_clinio = 500;
+	}
+}
+
+/* Fonction non bloquante envoyant une 	chaîne par l'UART */
 int _async_puts(const char* s) {
 	/* Cette fonction doit utiliser un traitant d'interruption
 	 * pour gérer l'envoi de la chaîne s (qui doit rester
@@ -192,6 +188,12 @@ int _async_puts(const char* s) {
 	return 1;
 	}
 
+void init_all(){
+	init_LD2();
+	init_PB();
+	init_USART();
+}
+
 int main() {
   
 	printf("\e[2J\e[1;1H\r\n");
@@ -204,27 +206,35 @@ int main() {
 	printf("APB1CLK= %9lu Hz\r\n",get_APB1CLK());
 	printf("APB2CLK= %9lu Hz\r\n",get_APB2CLK());
 	printf("\r\n");
-	
-	//affichage_clavier();
-	//ecrire_carac();
-	init_LD2();
-	init_PB();
-	GPIOA.ODR = GPIOA.ODR | (0x0020);
+
+	init_all();
+
+	GPIOA.ODR = GPIOA.ODR | (0x0020); // Allumer la led
+
 	systick_init(1000); // Toute les millisecondes
 
-	while (1){
-		//allumer_LED_infini();
-		//clignoter_LED();
-		//allumer_clignoter_LED();
 
-		if(is_button_pressed()){
-			frequence_clinio = 250;
-		}
-		else {
-			frequence_clinio = 1000;
-		}
-		
+	while (1){
+
+		// PARTIE BOUTON
+
+		// if(is_button_pressed()){
+		// 	frequence_clinio = 250;
+		// }
+		// else {
+		// 	frequence_clinio = 500;
+		// }
+
+		// PARTIE USART SANS INTERRUPTION
+
+		//  if(USART2.SR & 0x20){
+		// 	frequence_clinio = 1000;
+		//  }
+		//  else {
+		// 	frequence_clinio = 500;
+		//  }
 	}
+			
 	
 	return 0;
 }

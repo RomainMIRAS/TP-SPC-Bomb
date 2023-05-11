@@ -8,6 +8,15 @@
 
 static volatile char c=0;
 
+void tempo_500ms(){
+	volatile uint32_t duree;
+	/* estimation, suppose que le compilateur n'optimise pas trop... */
+	for (duree = 0; duree < 5600000 ; duree++){
+		;
+	}
+
+}
+
 void init_LD2(){
 	/* on positionne ce qu'il faut dans les différents
 	   registres concernés */
@@ -29,6 +38,9 @@ int is_button_pressed(){
 
 }
 
+/**
+ * Allume la LED LD2 Pour la première partie de la question 1
+ */
 void allumer_LED_infini(){
 	/* 
 		init_L2()
@@ -36,10 +48,6 @@ void allumer_LED_infini(){
 			si bouton push (voir avec IDR) alors
 				allumer LED
 	*/
-	
-	init_LD2();
-	init_PB();
-
 	while(1){
 		if(is_button_pressed()){
 			GPIOA.ODR = GPIOA.ODR |(0x0020);
@@ -51,7 +59,6 @@ void allumer_LED_infini(){
 }
 
 void clignoter_LED(){
-	init_LD2();
 	while(1){
 		GPIOA.ODR = GPIOA.ODR |(0x0020);
 		tempo_500ms();
@@ -61,9 +68,6 @@ void clignoter_LED(){
 }
 
 void allumer_clignoter_LED(){
-	init_LD2();
-	init_PB();
-
 	while(1){
 		if(is_button_pressed()){
 			GPIOA.ODR = GPIOA.ODR |(0x0020);
@@ -81,101 +85,12 @@ void allumer_clignoter_LED(){
 	}
 }
 
-void tempo_500ms(){
-	volatile uint32_t duree;
-	/* estimation, suppose que le compilateur n'optimise pas trop... */
-	for (duree = 0; duree < 5600000 ; duree++){
-		;
-	}
-
-}
-
-void init_USART(){
-	GPIOA.MODER = (GPIOA.MODER & 0xFFFFFF0F) | 0x000000A0;
-	GPIOA.AFRL = (GPIOA.AFRL & 0xFFFF00FF) | 0x00007700;
-	USART2.BRR = get_APB1CLK()/9600;
-	USART2.CR3 = 0;
-	USART2.CR2 = 0;
-}
-
-void _putc(const char c){
-	while( (USART2.SR & 0x80) == 0);  
-	USART2.DR = c;
-}
-
-void _puts(const char *c){
-	int len = strlen(c);
-	for (int i=0;i<len;i++){
-		_putc(c[i]);
-	}
-}
-
-char _getc(){
-	/* À compléter */
-	char c;
-	scanf("%c",&c);	
-	return c;
-}
-
-
-void affichage_clavier(){	
-	while(1){
-		_putc(_getc());	
-	}
-}
-
-
-void ecrire_carac(){
-	_putc('c');
-	_putc(0x0A);
-	_putc('o');
-	//_putc(0x0D);
-	_putc('u');
-	//_putc(0x0A);
-	_putc('c');
-	_putc(0x0A);
-	_putc(0x0D);
-	_putc('o');
-}
-
-void ecrire_carac_puts(){
-	_puts("coucou");
-}
-
 /* Initialisation du timer système (systick) */
 void systick_init(uint32_t freq){
 	uint32_t p = get_SYSCLK()/freq;
 	SysTick.LOAD = (p-1) & 0x00FFFFFF;
 	SysTick.VAL = 0;
 	SysTick.CTRL |= 7;
-}
-
-void __attribute__((interrupt)) SysTick_Handler(){
-	/* Le fait de définir cette fonction suffit pour
-	 * qu'elle soit utilisée comme traitant,
-	 * cf les fichiers de compilation et d'édition de lien
-	 * pour plus de détails.
-	 */
-	/* ... */
-}
-
-/* Fonction non bloquante envoyant une chaîne par l'UART */
-int _async_puts(const char* s) {
-	/* Cette fonction doit utiliser un traitant d'interruption
-	 * pour gérer l'envoi de la chaîne s (qui doit rester
-	 * valide pendant tout l'envoi). Elle doit donc être
-	 * non bloquante (pas d'attente active non plus) et
-	 * renvoyer 0.
-	 *
-	 * Si une chaîne est déjà en cours d'envoi, cette
-	 * fonction doit renvoyer 1 (et ignorer la nouvelle
-	 * chaîne).
-	 *
-	 * Si s est NULL, le code de retour permet de savoir
-	 * si une chaîne est encore en cours d'envoi ou si
-	 * une nouvelle chaîne peut être envoyée.
-	 */
-	/* À compléter */
 }
 
 int main() {
@@ -191,14 +106,15 @@ int main() {
 	printf("APB2CLK= %9lu Hz\r\n",get_APB2CLK());
 	printf("\r\n");
 	
-	//affichage_clavier();
-	ecrire_carac_puts();
-	//ecrire_carac();
+	init_LD2();
+	init_PB();
+
 	while (1){
+		// Pour la première partie de la question 1
 		//allumer_LED_infini();
-		//clignoter_LED();
-		//allumer_clignoter_LED();
-		
+
+		// Pour la troisième partie de la question 1
+		allumer_clignoter_LED();
 	}
 	
 	return 0;

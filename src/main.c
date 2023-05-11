@@ -19,7 +19,12 @@ static volatile int compteurMiliseconde = 0;
 
 static volatile int secondCounter = 0;
 
+static const int freq_buzzer = 5;
+
+static volatile int switch_buzzer = freq_buzzer;
+
 static volatile int etatJeu = WAITING;
+
 
 /*
 	Initialise toutes les couleurs de la LED tricolore
@@ -64,6 +69,16 @@ void initBarre4Led(){
 	GPIOA.PUPDR &= 0xFFFF03CF;
 }
 
+void initBuzzer(){
+	RCC.AHB1ENR |= 0x02; // GPIOB
+
+	//As a Led on GPIOB on pin 9
+	GPIOB.OTYPER &= ~(0x1<<9); //Output push-pull
+	GPIOB.OSPEEDR |= 0x03<<18; //High speed
+	GPIOB.MODER = (GPIOB.MODER & 0xFFF3FFFF) | 0x00040000; //Output function
+	GPIOB.PUPDR &= 0xFFF3FFFF;// No pull-up, no pull-down
+}
+
 void initLevers(){
 	RCC.AHB1ENR |= 0x02;  //On selectionne le GPIO modifié (le B)
 
@@ -75,31 +90,8 @@ void initLevers(){
 	GPIOB.MODER = (GPIOB.MODER & ~(0x3<<8)) | 0x1<<8; // Init lever 3
 	GPIOB.MODER = (GPIOB.MODER & ~(0x3<<6)) | 0x1<<6; // Init lever 4*/
 
-<<<<<<< HEAD
 	/*
 		Initialisation de tous les leviers en même temps
-=======
-void init_buzzer(){
-	//As a Led on GPIOB on pin 9
-	GPIOB.OTYPER &= ~(0x1<<9); //Output push-pull
-	GPIOB.OSPEEDR |= 0x03<<18; //High speed
-	GPIOB.MODER = (GPIOB.MODER & 0xFFF3FFFF) | 0x00040000; //Output mode (01)
-	GPIOB.PUPDR &= 0xFFF3FFFF;
-}
-
-int is_button_pressed(){
-	/* renvoie 1 si button pressed (IDR13 = 0) */
-	return (GPIOC.IDR & (0x1<<13)) == 0;
-
-}
-
-void allumer_LED_infini(){
-	/* 
-		init_L2()
-		while vrai
-			si bouton push (voir avec IDR) alors
-				allumer LED
->>>>>>> 41da4a7 (CHangement buzzer)
 	*/
 	GPIOB.MODER = (GPIOB.MODER & 0xFFFFC03F) | 0x00001540;
 }
@@ -118,20 +110,11 @@ int isLever2On(){
 	return !((GPIOB.IDR & (0x1<<5)) == 0);
 }
 
-<<<<<<< HEAD
 /*
 	Renvoie 1 si le levier 3 est sur la position ON et 0 sinon
 */
 int isLever3On(){
 	return !((GPIOB.IDR & (0x1<<4)) == 0);
-=======
-void tempo_500ms(){
-	volatile uint32_t duree;
-	/* estimation, suppose que le compilateur n'optimise pas trop... */
-	for (duree = 0; duree < 5600000 ; duree++){
-		;
-	}
->>>>>>> 41da4a7 (CHangement buzzer)
 }
 
 /*
@@ -176,6 +159,14 @@ void inverserEtatLedVert () {
 void inverserEtatLedBleu () {
 	GPIOA.ODR = GPIOA.ODR ^(0x0400);
 }
+
+/*
+	Inverse l'état du Buzzer (allumé => éteint, éteint => allumé)
+*/
+void inverserEtatBuzz () {
+	GPIOB.ODR = GPIOB.ODR ^(0x0200);
+}
+ 
 
 /*
 	Allume la LED rouge
@@ -303,6 +294,17 @@ void eteindreLedBasGauche () {
 	GPIOA.ODR = GPIOA.ODR &(0xFFEF);
 }
 
+/*
+Make a sound when the player loose for 5 seconds
+*/
+void buzz() {
+	switch_buzzer--;
+	if (switch_buzzer == 0){
+		inverserEtatBuzz();
+		switch_buzzer = freq_buzzer;
+	}
+}
+
 /* Initialisation du timer système (systick) */
 void systick_init(uint32_t freq){
 	uint32_t p = get_SYSCLK()/freq;
@@ -315,7 +317,6 @@ Traitant d'intéruption du timer (appelé toutes les miliseconde)
 */
 void __attribute__((interrupt)) SysTick_Handler(){
 	compteurMiliseconde++;
-
 	if (etatJeu != WAITING) {
 		
 		if (compteurMiliseconde%1000 == 0){ // Chaque seconde
@@ -333,6 +334,10 @@ void __attribute__((interrupt)) SysTick_Handler(){
 
 	if (compteurMiliseconde % frequenceCliniotement == 0 && etatJeu == PLAYING){
 			inverserEtatLedBleu();
+	}
+
+	if (etatJeu == LOSE) {
+		buzz();
 	}
 }
 
@@ -403,6 +408,7 @@ void initAll () {
 	initLedTricolore();	//Initialisation de la LED tricolore
 	initLevers();		//Initialisation des leviers
 	initButton();		//Initialisation du boutons de la carte fille
+	initBuzzer();		//Initialisation du buzzer
 }
 
 /*
@@ -415,44 +421,7 @@ void startGame() {
 	initBombe();
 }
 
-/*
-Make a sound when the player loose
-*/
-void loosingSong () {
-
-}
-
-int frequence[] = {262, 294, 330, 349, 370, 392, 440, 494};     // DO, RE, MI, FA, SOL, LA, SI, DO
-
-/**
- * @brief Joue une note
- * @param freq Fréquence de la note
- * @param duration Durée de la note en ms
- * @return void
-*/
-void tone (int freq, int duration) {
-	int i;
-	int period = 1000000 / freq;
-	int pulse = period / 2;
-	for (i = 0; i < duration * 1000; i += period) {
-		GPIOA.ODR = GPIOA.ODR |(0x0100); // ROUGE
-		tempo(pulse);
-		GPIOA.ODR = GPIOA.ODR & ~(0x0100); // ROUGE
-		tempo(pulse);
-	}
-}
-
-void noTone() {
-	GPIOA.ODR = GPIOA.ODR & ~(0x0100); // ROUGE
-}
-
-void tempo(int duree){
-	volatile uint32_t duree2;
-	/* estimation, suppose que le compilateur n'optimise pas trop... */
-	for (duree2 = 0; duree2 < duree ; duree2++){
-		;
-	}
-}
+//Function AF1
 
 int main() {
   
@@ -466,21 +435,8 @@ int main() {
 	printf("APB1CLK= %9lu Hz\r\n",get_APB1CLK());
 	printf("APB2CLK= %9lu Hz\r\n",get_APB2CLK());
 	printf("\r\n");
-<<<<<<< HEAD
-=======
-	init_Tricolor_Led();
-	init_buzzer();
-	systick_init(1000); // Traitant toutes les millisecondes
-	
-	init_Barre_Led();
-	GPIOA.ODR = GPIOA.ODR | (0x0010); // Allumer LED bas gauche
-	GPIOA.ODR = GPIOA.ODR | (0x0020); // Allumer LED bas droite
-	GPIOA.ODR = GPIOA.ODR | (0x0040);  // Allumer LED haut droite
-	GPIOA.ODR = GPIOA.ODR | (0x0080); // Allumer LED haut gauche
->>>>>>> 41da4a7 (CHangement buzzer)
 
 	initAll(); // Initialisation de tous les composants
-
 	/*
 		Variable pour garder l'état précédent des leviers en mémoire
 		=> Permet de se servir des leviers comme d'un bouton (à chaque changement => pression d'un bouton)
@@ -491,7 +447,6 @@ int main() {
 	int previousStateLever4 = isLever4On();
 
 	while (1){
-<<<<<<< HEAD
 		if (etatJeu == WAITING) {
 			if (isButtonPressed()) { // Quand on lance le jeu, on initialise le générateur aléatoire
 				startGame();
@@ -533,7 +488,6 @@ int main() {
 		} else { //Si on a perdu la LED rouge s'allume
 			eteindreLedBleu();
 			allumerLedRouge();
-			loosingSong();
 		}
 
 		if (etatJeu == WIN || etatJeu == LOSE) {
@@ -541,14 +495,6 @@ int main() {
 				restart();
 			}
 		}
-=======
-		for (int i = 0; i <= 8; i++)    //on parcour les 8 fréquence définies dans le tableau plus haut
-			{
-			tone(frequence[i], 500);    //tone(Pin, frequence, durée)
-			noTone();
-			tempo_500ms();                                                                                
-			}
->>>>>>> 41da4a7 (CHangement buzzer)
 	}
 	
 	return 0;

@@ -13,19 +13,21 @@
 #define PLAYING 0
 #define WAITING -1
 
-static volatile int frequenceCliniotement = 1000;
+static volatile int frequenceCliniotementLedBleu = 1000; // Représente la vitesse de clignotement de la LED bleu durant le jeu (1 fois par seconde au début)
 
-static volatile int compteurMiliseconde = 0;
+static volatile int compteurMiliseconde = 0; // Est incrémenté de 1 à chaque milliseconde
 
-static volatile int secondCounter = 0;
+static volatile int secondCounter = 0; // Est incrémenté de 1 à chaque seconde
 
-static const int freq_buzzer = 2;
+static volatile int freqBuzzer = 2; // Représente le nombre de millisecond entre chaque activation du buzzer 2 par défaut (500Hz)
 
-static volatile int switch_buzzer = freq_buzzer;
+static volatile int switchBuzzer = 2; // Représente le temps écouler depuis le dernier changement d'état du buzzer
 
-static volatile int etatJeu = WAITING;
+static volatile int etatJeu = WAITING; // Représente l'état du jeu (WIN, LOSE, PLAYING, WAITING)
 
-static volatile int makeSound = 0;
+static volatile int makeSound = 0; //Lorsque cette variable vaut 1, le buzzer emet du son
+
+static volatile int secondStartWinningSong = 0; //La seconde à laquel le joueur à gagner (utile pour lancer le son de victoire)
 
 
 /*
@@ -38,15 +40,15 @@ void initLedTricolore(){
 		Initialisation des LED séparément
 	*/
 
-	/*//PARTIE ROUGE
+	/*//LED ROUGE
 	GPIOA.MODER = (GPIOA.MODER & 0xFFFCFFFF) | 0x00010000;
 	GPIOA.PUPDR &= 0xFFFCFFFF;
 
-	// PARTIE VERT
+	// LED VERT
 	GPIOA.MODER = (GPIOA.MODER & 0xFFF3FFFF) | 0x00040000;
 	GPIOA.PUPDR &= 0xFFF3FFFF;
 
-	// PARTIE BLEU
+	// LED BLEU
 	GPIOA.MODER = (GPIOA.MODER & 0xFFCFFFFF) | 0x00100000;
 	GPIOA.PUPDR &= 0xFFCFFFFF;*/
 	
@@ -91,10 +93,10 @@ void inverserEtatBuzz () {
 Make a sound
 */
 void buzz() {
-	switch_buzzer--;
-	if (switch_buzzer == 0){
+	switchBuzzer--;
+	if (switchBuzzer == 0){
 		inverserEtatBuzz();
-		switch_buzzer = freq_buzzer;
+		switchBuzzer = freqBuzzer;
 	}
 }
 
@@ -103,11 +105,13 @@ void initLevers(){
 
 	/*
 		Initialisation des leviers séparément
-	*///On modifie le GPIOB
-	/*GPIOB.MODER = (GPIOB.MODER & ~(0x3<<12)) | 0x1<<12; // Init lever 1
+	*/
+	/*
+	GPIOB.MODER = (GPIOB.MODER & ~(0x3<<12)) | 0x1<<12; // Init lever 1
 	GPIOB.MODER = (GPIOB.MODER & ~(0x3<<10)) | 0x1<<10; // Init lever 2
 	GPIOB.MODER = (GPIOB.MODER & ~(0x3<<8)) | 0x1<<8; // Init lever 3
-	GPIOB.MODER = (GPIOB.MODER & ~(0x3<<6)) | 0x1<<6; // Init lever 4*/
+	GPIOB.MODER = (GPIOB.MODER & ~(0x3<<6)) | 0x1<<6; // Init lever 4
+	*/
 
 	/*
 		Initialisation de tous les leviers en même temps
@@ -315,39 +319,86 @@ void systick_init(uint32_t freq){
 /*
 Traitant d'intéruption du timer (appelé toutes les miliseconde)
 */
-void __attribute__((interrupt)) SysTick_Handler(){
+void __attribute__((interrupt)) SysTick_Handler() {
 	compteurMiliseconde++;
 	if (etatJeu != WAITING) {
-		
-		if (compteurMiliseconde%1000 == 0){ // Chaque seconde
+
+		if (compteurMiliseconde%1000 == 0) { // Chaque seconde
 			secondCounter++;
 
 			if (secondCounter >= 30 && etatJeu == PLAYING) { // Si ca fait plus de 30 secondes le joueur à perdu
 				etatJeu = LOSE;
-			} 
+			}
 			
 			if (secondCounter % 5 == 0) { // Toutes les 5 secondes la vitesse de clignotement est divisé par 2
-				frequenceCliniotement = frequenceCliniotement / 2;
+				frequenceCliniotementLedBleu = frequenceCliniotementLedBleu / 2;
+			}
+		}
+		int freqSoundBeforeBomb = 0;
+
+
+		if (etatJeu == PLAYING) {
+
+			/*
+			Gère le son de défaite
+			*/
+			switch (secondCounter) { // On gère la vitesse du "clignotment" du son (de plus en plus rapide quand on approche des 30 secondes)
+				case 25:
+				case 26:
+					freqSoundBeforeBomb = 200;
+					break;
+				case 27:
+				case 28:
+					freqSoundBeforeBomb = 100;
+					break;
+				case 29:
+					freqSoundBeforeBomb = 40;
+					break;
+				default:
+					freqSoundBeforeBomb = 0; //Quand on ne veut pas jouer de sons
+					break;
 			}
 		}
 
-		int freqSoundBeforeBomb;
-
-		switch (secondCounter) { // On gère la vitesse du "clignotment" du son (de plus en plus rapide quand on approche des 30 secondes)
-		case 25:
-		case 26:
-			freqSoundBeforeBomb = 200;
-			break;
-		case 27:
-		case 28:
-			freqSoundBeforeBomb = 100;
-			break;
-		case 29:
-			freqSoundBeforeBomb = 40;
-			break;
-		default:
-			freqSoundBeforeBomb = 0;
-			break;
+		if (etatJeu == WIN) {
+			/*
+			Gère le son de victoire
+			*/
+			if (secondCounter == secondStartWinningSong + 1) {
+				if (compteurMiliseconde % 1000 == 0 || compteurMiliseconde % 1000 == 220 || compteurMiliseconde % 1000 == 440 || compteurMiliseconde % 1000 == 690) {
+					freqBuzzer = 1;
+					makeSound = 1;
+				} else if (compteurMiliseconde % 1000 == 200 || compteurMiliseconde % 1000 == 420 || compteurMiliseconde % 1000 == 640 || compteurMiliseconde % 1000 == 890) {
+					makeSound = 0;
+				} else if (compteurMiliseconde % 1000 == 990) {
+					freqBuzzer = 10;
+					makeSound = 1;
+				}
+			} else if (secondCounter == secondStartWinningSong + 2) {
+				if (compteurMiliseconde % 1000 == 490) {
+					freqBuzzer = 10;
+					makeSound = 1;
+				} else if (compteurMiliseconde % 1000 == 340 || compteurMiliseconde % 1000 == 890) {
+					makeSound = 0;
+				}
+			} else if (secondCounter == secondStartWinningSong + 3) {
+				if (compteurMiliseconde % 1000 == 140) {
+					freqBuzzer = 2;
+					makeSound = 1;
+				} else if (compteurMiliseconde % 1000 == 340 || compteurMiliseconde % 1000 == 490) {
+					makeSound = 0;
+				} else if (compteurMiliseconde % 1000 == 390) {
+					freqBuzzer = 10;
+					makeSound = 1;
+				} else if ( compteurMiliseconde % 1000 == 540) {
+					freqBuzzer = 3;
+					makeSound = 1;
+				}
+			} else if (secondCounter == secondStartWinningSong + 4) {
+				if (compteurMiliseconde % 1000 == 240) {
+					makeSound = 0;
+				}
+			}
 		}
 
 		if (freqSoundBeforeBomb != 0 && compteurMiliseconde % freqSoundBeforeBomb == 0) { //On fait "clignoter" le son
@@ -355,12 +406,13 @@ void __attribute__((interrupt)) SysTick_Handler(){
 		}
 	}
 
-	if (compteurMiliseconde % frequenceCliniotement == 0 && etatJeu == PLAYING){ //On gère le clignotement de la LED bleu
+	if (compteurMiliseconde % frequenceCliniotementLedBleu == 0 && etatJeu == PLAYING) { //On gère le clignotement de la LED bleu
 			inverserEtatLedBleu();
 	}
 
 	if (etatJeu == LOSE || makeSound) { // Si on a perdu ou qu'il faut jouer du son on active le son
 		buzz();
+		freqBuzzer = 2;
 	}
 }
 
@@ -375,33 +427,30 @@ int bombeOff () {
 Initialise les 4 LED de la barre de lED de manière aléatoire avec au minimum 1 LED éteinte
 */
 void initBombe() {
-	do {
-		int ledOn = rand() % 2;
-		if (ledOn) {
+	do { // Tant que toutes les LED sont allumé on génère une cobinaison aléatoire (pour éviter une victoire instantané)
+		
+		/*
+		Chaque LED a 1 chance sur 2 d'être allumé
+		*/
+		if (rand() % 2) {
 			allumerLedBasDroite();
 		} else {
 			eteindreLedBasDroite();
 		}
 
-
-		ledOn = rand() % 2;
-		if (ledOn) {
+		if (rand() % 2) {
 			allumerLedBasGauche();
 		} else {
 			eteindreLedBasGauche();
 		}
 
-
-		ledOn = rand() % 2;
-		if (ledOn) {
+		if (rand() % 2) {
 			allumerLedHautDroite();
 		} else {
 			eteindreLedHautDroite();
 		}
 
-
-		ledOn = rand() % 2;
-		if (ledOn) {
+		if (rand() % 2) {
 			allumerLedHautGauche();
 		} else {
 			eteindreLedHautGauche();
@@ -413,14 +462,14 @@ void initBombe() {
 	Remet le jeu à 0 de manière à pouvoir refaire une partit
 */
 void restart () {
-	frequenceCliniotement = 1000;
+	frequenceCliniotementLedBleu = 1000;
 	compteurMiliseconde = 0;
 	secondCounter = 0;
 	etatJeu = PLAYING;
+	makeSound = false;
 	eteindreLedRouge();
 	eteindreLedVert();
 	initBombe();
-	makeSound = false;
 }
 
 /*
@@ -443,6 +492,7 @@ void startGame() {
 	srand(compteurMiliseconde);
 	compteurMiliseconde = 0;
 	initBombe();
+	switchBuzzer = freqBuzzer;
 }
 
 //Function AF1
@@ -461,6 +511,7 @@ int main() {
 	printf("\r\n");
 
 	initAll(); // Initialisation de tous les composants
+	
 	/*
 		Variable pour garder l'état précédent des leviers en mémoire
 		=> Permet de se servir des leviers comme d'un bouton (à chaque changement => pression d'un bouton)
@@ -471,13 +522,17 @@ int main() {
 	int previousStateLever4 = isLever4On();
 
 	while (1){
-		if (etatJeu == WAITING) {
+		switch (etatJeu) {
+		case WAITING: // Attente que le joueur lace le jeu
 			if (isButtonPressed()) { // Quand on lance le jeu, on initialise le générateur aléatoire
 				startGame();
 			}
-		} else if (etatJeu == PLAYING) {
+			break;
+
+		case PLAYING: // On actualise les LED en fonction des leviers que le joueur active
 			if (bombeOff()) { //Si toutes les LED sont allumé
 				etatJeu = WIN;
+				secondStartWinningSong = secondCounter;
 			}
 
 			int actualLeverState = isLever1On();
@@ -506,15 +561,23 @@ int main() {
 				allumerLedHautGauche();
 				eteindreLedHautDroite();
 			}
-		} else if (etatJeu == WIN) { // Si on a gagner la LED verte s'allume
+			break;
+
+		case WIN: // Si on a gagner la LED verte s'allume
 			eteindreLedBleu();
 			allumerLedVert();
-		} else { //Si on a perdu la LED rouge s'allume
+			break;
+		
+		case LOSE: //Si on a perdu la LED rouge s'allume
 			eteindreLedBleu();
 			allumerLedRouge();
+			break;
+		
+		default:
+			break;
 		}
 
-		if (etatJeu == WIN || etatJeu == LOSE) {
+		if (etatJeu == WIN || etatJeu == LOSE) { // Quand la partie est finit, pour en relancer une
 			if (isButtonPressed()) {
 				restart();
 			}
